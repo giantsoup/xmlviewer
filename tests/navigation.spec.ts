@@ -56,12 +56,20 @@ test.describe('navigation and shortcuts', () => {
     page,
   }) => {
     const tree = page.getByRole('tree')
+
     await tree.focus()
     await tree.press('/')
     const search = page.getByPlaceholder('Search tags, attributes, or text')
     await expect
       .poll(async () => page.evaluate(() => document.activeElement?.getAttribute('placeholder')))
       .toBe('Search tags, attributes, or text')
+
+    await search.fill('chapter')
+    await search.focus()
+    await page.keyboard.type('i/')
+    await expect(search).toHaveValue('chapteri/')
+    await expect(page.locator('.stats-dock')).toBeVisible()
+    await expect(page.locator('.shortcut-popover')).toHaveCount(0)
 
     await search.fill('chapter')
     await expect(page.getByText('1/2')).toBeVisible()

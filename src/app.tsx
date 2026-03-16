@@ -69,6 +69,21 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest('input, textarea, [contenteditable="true"]'))
 }
 
+function isSearchInputTarget(
+  target: EventTarget | null,
+  searchInput: HTMLInputElement | null,
+): boolean {
+  if (!searchInput) {
+    return false
+  }
+
+  if (document.activeElement === searchInput) {
+    return true
+  }
+
+  return target instanceof Node && searchInput.contains(target)
+}
+
 function getFileName(file: File | null): string {
   if (!file) {
     return ''
@@ -80,6 +95,7 @@ function getFileName(file: File | null): string {
 export function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchInputFocusedRef = useRef(false)
   const pasteInputRef = useRef<HTMLTextAreaElement>(null)
   const treeRef = useRef<HTMLDivElement>(null)
   const helpButtonRef = useRef<HTMLButtonElement>(null)
@@ -155,8 +171,25 @@ export function App() {
     }
 
     const button = rowRefs.current.get(selectedNodeId)
-    button?.focus({ preventScroll: false })
-    button?.scrollIntoView({ block: 'nearest' })
+    if (!button) {
+      return
+    }
+
+    button.scrollIntoView({ block: 'nearest' })
+
+    if (searchInputFocusedRef.current) {
+      return
+    }
+
+    const activeElement = document.activeElement
+    const shouldMoveFocus =
+      !(activeElement instanceof HTMLElement) ||
+      activeElement === document.body ||
+      Boolean(treeRef.current?.contains(activeElement))
+
+    if (shouldMoveFocus) {
+      button.focus({ preventScroll: true })
+    }
   }, [selectedNodeId, visibleRows.length])
 
   useEffect(() => {
@@ -198,6 +231,12 @@ export function App() {
       const modifier = isMac ? event.metaKey : event.ctrlKey
       const key = event.key
       const typing = isEditableTarget(event.target)
+      const typingInSearch =
+        searchInputFocusedRef.current || isSearchInputTarget(event.target, searchInputRef.current)
+
+      if (typingInSearch) {
+        return
+      }
 
       if (modifier && key.toLowerCase() === 'o') {
         event.preventDefault()
@@ -676,6 +715,12 @@ export function App() {
                     <input
                       ref={searchInputRef}
                       value={searchQuery}
+                      onFocus={() => {
+                        searchInputFocusedRef.current = true
+                      }}
+                      onBlur={() => {
+                        searchInputFocusedRef.current = false
+                      }}
                       onInput={(event) => handleSearchInput((event.currentTarget as HTMLInputElement).value)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
